@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 from duckduckgo_search import DDGS
 import plotly.graph_objects as go
-from groq import Groq
+import google.generativeai as genai
 
 # 1. Configure page layout
 st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
@@ -27,7 +27,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v5.0 | Secure Cloud Edition")
+    st.caption("MarketPulse v6.0 | Gemini 1.5 Flash Edition")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
@@ -40,6 +40,13 @@ if run_btn:
     st.session_state.messages = [] 
     if "summary" in st.session_state:
         del st.session_state["summary"]
+
+# --- INITIALIZE GEMINI AI ---
+api_key = st.secrets.get("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    # Using the lightning-fast Flash model
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 3. Main Dashboard Area
 if st.session_state.analyze_triggered:
@@ -112,14 +119,10 @@ if st.session_state.analyze_triggered:
             with col_genai:
                 st.subheader("🧠 Automated Strategic Synthesis")
                 
-                # Fetch the hidden API key from secrets
-                api_key = st.secrets.get("GROQ_API_KEY")
-                
                 if not api_key:
-                    st.error("API Key not found in secrets.toml.")
+                    st.error("API Key not found. Please add GEMINI_API_KEY to secrets.toml.")
                 elif news_context:
                     if "summary" not in st.session_state:
-                        client = Groq(api_key=api_key)
                         prompt = f"""
                         Based strictly on the following recent news about {company_name}, provide a concise, 3-bullet-point strategic diagnostic. Format exactly like this:
                         * ⚠️ **Immediate Headwinds:** [1 sentence]
@@ -128,12 +131,9 @@ if st.session_state.analyze_triggered:
                         
                         News Context: {news_context}
                         """
-                        chat_completion = client.chat.completions.create(
-                            messages=[{"role": "user", "content": prompt}],
-                            model="llama-3.1-8b-instant", 
-                            temperature=0.2, 
-                        )
-                        st.session_state.summary = chat_completion.choices[0].message.content
+                        # Gemini API Call
+                        response = model.generate_content(prompt)
+                        st.session_state.summary = response.text
                     
                     st.markdown(st.session_state.summary)
                 else:
@@ -142,7 +142,7 @@ if st.session_state.analyze_triggered:
             # --- AI COPILOT CHAT ---
             st.divider()
             st.subheader("💬 Ask the Copilot")
-            st.caption(f"Ask questions specifically about {company_name}'s recent news and strategy.")
+            st.caption(f"Powered by Gemini 1.5 Flash. Ask questions specifically about {company_name}'s recent news and strategy.")
             
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
@@ -154,18 +154,22 @@ if st.session_state.analyze_triggered:
                     st.markdown(prompt)
 
                 with st.chat_message("assistant"):
-                    client = Groq(api_key=st.secrets.get("GROQ_API_KEY"))
-                    system_msg = {"role": "system", "content": f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news context. Do not introduce yourself or use persona filler text like 'As an analyst'.\n\nContext: {news_context}"}
-                    api_messages = [system_msg] + st.session_state.messages
-                    
-                    response = client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=api_messages,
-                        temperature=0.4
-                    )
-                    msg_content = response.choices[0].message.content
-                    st.markdown(msg_content)
-                    st.session_state.messages.append({"role": "assistant", "content": msg_content})
+                    if api_key:
+                        # Construct a unified prompt containing the context and the entire chat history
+                        conversation_block = f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news context. Do not introduce yourself.\n\nContext: {news_context}\n\n"
+                        
+                        for msg in st.session_state.messages:
+                            speaker = "Analyst" if msg["role"] == "assistant" else "User"
+                            conversation_block += f"{speaker}: {msg['content']}\n"
+                        
+                        conversation_block += "Analyst:"
+                        
+                        # Call Gemini
+                        response = model.generate_content(conversation_block)
+                        msg_content = response.text
+                        
+                        st.markdown(msg_content)
+                        st.session_state.messages.append({"role": "assistant", "content": msg_content})
 
         except Exception as e:
             st.error(f"An error occurred. Details: {e}")
