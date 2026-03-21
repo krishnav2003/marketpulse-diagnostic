@@ -1,6 +1,5 @@
 import streamlit as st
 import yfinance as yf
-from duckduckgo_search import DDGS
 import plotly.graph_objects as go
 import google.generativeai as genai
 
@@ -11,16 +10,8 @@ st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_financial_data(ticker):
     stock = yf.Ticker(ticker)
-    return stock.info, stock.history(period="6mo")
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def get_news_data(company_name):
-    try:
-        ddgs = DDGS()
-        return list(ddgs.news(f"{company_name} company news strategy", max_results=4))
-    except Exception:
-        # Graceful degradation: Return empty list if DuckDuckGo rate-limits us
-        return []
+    # yfinance natively provides news, info, and history
+    return stock.info, stock.history(period="6mo"), stock.news
 
 # 2. Sidebar for Inputs
 with st.sidebar:
@@ -31,7 +22,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v6.1 | Gemini 2.5 Flash Edition")
+    st.caption("MarketPulse v7.0 | Native API Edition")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
@@ -49,7 +40,6 @@ if run_btn:
 api_key = st.secrets.get("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
-    # Using the newest lightning-fast Flash model
     model = genai.GenerativeModel('gemini-2.5-flash')
 
 # 3. Main Dashboard Area
@@ -57,7 +47,7 @@ if st.session_state.analyze_triggered:
     with st.spinner("Aggregating intelligence..."):
         try:
             # --- Fetch Primary Data ---
-            info, hist = get_financial_data(ticker_symbol)
+            info, hist, raw_news = get_financial_data(ticker_symbol)
             company_name = info.get('shortName', ticker_symbol)
             
             st.markdown(f"## 🏢 Strategic Diagnostic: {company_name}")
@@ -82,7 +72,7 @@ if st.session_state.analyze_triggered:
             # --- Middle Row: Charting ---
             st.write("") 
             if comp_symbol:
-                comp_info, comp_hist = get_financial_data(comp_symbol)
+                comp_info, comp_hist, _ = get_financial_data(comp_symbol)
                 if not hist.empty and not comp_hist.empty:
                     hist['PctReturn'] = (hist['Close'] / hist['Close'].iloc[0] - 1) * 100
                     comp_hist['PctReturn'] = (comp_hist['Close'] / comp_hist['Close'].iloc[0] - 1) * 100
@@ -112,16 +102,21 @@ if st.session_state.analyze_triggered:
             
             with col_news:
                 st.subheader("📰 Live Market Context")
-                news_results = get_news_data(company_name)
                 
-                if news_results:
-                    for article in news_results:
-                        with st.expander(f"**{article['title']}**", expanded=False):
-                            st.caption(f"Source: {article.get('source', 'Web')}")
-                            st.write(article['body'])
-                            news_context += f"Title: {article['title']}\nSummary: {article['body']}\n\n"
+                # Using Yahoo Finance's built-in news
+                if raw_news:
+                    for article in raw_news[:4]:
+                        title = article.get('title', 'Market Update')
+                        publisher = article.get('publisher', 'Yahoo Finance')
+                        link = article.get('link', '#')
+                        
+                        with st.expander(f"**{title}**", expanded=False):
+                            st.caption(f"Source: {publisher}")
+                            st.markdown(f"[Read full article here]({link})")
+                            
+                        news_context += f"Headline: {title}\nSource: {publisher}\n\n"
                 else:
-                    st.warning("News data temporarily unavailable due to upstream rate limits.")
+                    st.warning("No recent news found for this ticker.")
             
             with col_genai:
                 st.subheader("🧠 Automated Strategic Synthesis")
@@ -131,7 +126,7 @@ if st.session_state.analyze_triggered:
                 elif news_context:
                     if "summary" not in st.session_state:
                         prompt = f"""
-                        Based strictly on the following recent news about {company_name}, provide a concise, 3-bullet-point strategic diagnostic. Format exactly like this:
+                        Based strictly on the following recent news headlines about {company_name}, provide a concise, 3-bullet-point strategic diagnostic. Format exactly like this:
                         * ⚠️ **Immediate Headwinds:** [1 sentence]
                         * 🔄 **Strategic Pivots:** [1 sentence]
                         * 📊 **Market Sentiment:** [1 sentence]
@@ -161,7 +156,7 @@ if st.session_state.analyze_triggered:
 
                 with st.chat_message("assistant"):
                     if api_key:
-                        conversation_block = f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news context. Do not introduce yourself.\n\nContext: {news_context}\n\n"
+                        conversation_block = f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news headlines. Do not introduce yourself.\n\nContext: {news_context}\n\n"
                         
                         for msg in st.session_state.messages:
                             speaker = "Analyst" if msg["role"] == "assistant" else "User"
