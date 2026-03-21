@@ -2,6 +2,8 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import google.generativeai as genai
+import feedparser
+import urllib.parse
 
 # 1. Configure page layout
 st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
@@ -10,8 +12,27 @@ st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_financial_data(ticker):
     stock = yf.Ticker(ticker)
-    # yfinance natively provides news, info, and history
-    return stock.info, stock.history(period="6mo"), stock.news
+    return stock.info, stock.history(period="6mo")
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_news_data(company_name, ticker):
+    # Use Google News RSS feed for reliable, real-time, rate-limit-free data
+    query = urllib.parse.quote(f"{ticker} stock OR {company_name} financial news")
+    url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+    
+    feed = feedparser.parse(url)
+    news_items = []
+    
+    # Grab the top 4 most recent articles
+    for entry in feed.entries[:4]:
+        publisher = entry.source.title if hasattr(entry, 'source') else 'Financial News'
+        news_items.append({
+            'title': entry.title,
+            'link': entry.link,
+            'publisher': publisher
+        })
+        
+    return news_items
 
 # 2. Sidebar for Inputs
 with st.sidebar:
@@ -22,7 +43,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v7.0 | Native API Edition")
+    st.caption("MarketPulse v9.0 | RSS Intelligence Edition")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
@@ -47,7 +68,7 @@ if st.session_state.analyze_triggered:
     with st.spinner("Aggregating intelligence..."):
         try:
             # --- Fetch Primary Data ---
-            info, hist, raw_news = get_financial_data(ticker_symbol)
+            info, hist = get_financial_data(ticker_symbol)
             company_name = info.get('shortName', ticker_symbol)
             
             st.markdown(f"## 🏢 Strategic Diagnostic: {company_name}")
@@ -72,7 +93,7 @@ if st.session_state.analyze_triggered:
             # --- Middle Row: Charting ---
             st.write("") 
             if comp_symbol:
-                comp_info, comp_hist, _ = get_financial_data(comp_symbol)
+                comp_info, comp_hist = get_financial_data(comp_symbol)
                 if not hist.empty and not comp_hist.empty:
                     hist['PctReturn'] = (hist['Close'] / hist['Close'].iloc[0] - 1) * 100
                     comp_hist['PctReturn'] = (comp_hist['Close'] / comp_hist['Close'].iloc[0] - 1) * 100
@@ -103,18 +124,16 @@ if st.session_state.analyze_triggered:
             with col_news:
                 st.subheader("📰 Live Market Context")
                 
-                # Using Yahoo Finance's built-in news
-                if raw_news:
-                    for article in raw_news[:4]:
-                        title = article.get('title', 'Market Update')
-                        publisher = article.get('publisher', 'Yahoo Finance')
-                        link = article.get('link', '#')
-                        
-                        with st.expander(f"**{title}**", expanded=False):
-                            st.caption(f"Source: {publisher}")
-                            st.markdown(f"[Read full article here]({link})")
+                # Fetch RSS News
+                live_news = get_news_data(company_name, ticker_symbol)
+                
+                if live_news:
+                    for article in live_news:
+                        with st.expander(f"**{article['title']}**", expanded=False):
+                            st.caption(f"Source: {article['publisher']}")
+                            st.markdown(f"[Read full article here]({article['link']})")
                             
-                        news_context += f"Headline: {title}\nSource: {publisher}\n\n"
+                        news_context += f"Headline: {article['title']}\nSource: {article['publisher']}\n\n"
                 else:
                     st.warning("No recent news found for this ticker.")
             
