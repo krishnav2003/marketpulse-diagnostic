@@ -19,7 +19,7 @@ def get_news_data(company_name):
         ddgs = DDGS()
         return list(ddgs.news(f"{company_name} company news strategy", max_results=4))
     except Exception:
-        # If DuckDuckGo rate-limits the server, return an empty list so the app survives
+        # Graceful degradation: Return empty list if DuckDuckGo rate-limits us
         return []
 
 # 2. Sidebar for Inputs
@@ -31,7 +31,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v6.0 | Gemini 2.5 Flash Edition")
+    st.caption("MarketPulse v6.1 | Gemini 2.5 Flash Edition")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
@@ -49,7 +49,7 @@ if run_btn:
 api_key = st.secrets.get("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
-    # Using the lightning-fast Flash model
+    # Using the newest lightning-fast Flash model
     model = genai.GenerativeModel('gemini-2.5-flash')
 
 # 3. Main Dashboard Area
@@ -114,11 +114,14 @@ if st.session_state.analyze_triggered:
                 st.subheader("📰 Live Market Context")
                 news_results = get_news_data(company_name)
                 
-                for article in news_results:
-                    with st.expander(f"**{article['title']}**", expanded=False):
-                        st.caption(f"Source: {article.get('source', 'Web')}")
-                        st.write(article['body'])
-                        news_context += f"Title: {article['title']}\nSummary: {article['body']}\n\n"
+                if news_results:
+                    for article in news_results:
+                        with st.expander(f"**{article['title']}**", expanded=False):
+                            st.caption(f"Source: {article.get('source', 'Web')}")
+                            st.write(article['body'])
+                            news_context += f"Title: {article['title']}\nSummary: {article['body']}\n\n"
+                else:
+                    st.warning("News data temporarily unavailable due to upstream rate limits.")
             
             with col_genai:
                 st.subheader("🧠 Automated Strategic Synthesis")
@@ -135,13 +138,12 @@ if st.session_state.analyze_triggered:
                         
                         News Context: {news_context}
                         """
-                        # Gemini API Call
                         response = model.generate_content(prompt)
                         st.session_state.summary = response.text
                     
                     st.markdown(st.session_state.summary)
                 else:
-                    st.warning("No news context found to synthesize.")
+                    st.info("Awaiting live news context to generate strategic synthesis.")
 
             # --- AI COPILOT CHAT ---
             st.divider()
@@ -159,7 +161,6 @@ if st.session_state.analyze_triggered:
 
                 with st.chat_message("assistant"):
                     if api_key:
-                        # Construct a unified prompt containing the context and the entire chat history
                         conversation_block = f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news context. Do not introduce yourself.\n\nContext: {news_context}\n\n"
                         
                         for msg in st.session_state.messages:
@@ -168,7 +169,6 @@ if st.session_state.analyze_triggered:
                         
                         conversation_block += "Analyst:"
                         
-                        # Call Gemini
                         response = model.generate_content(conversation_block)
                         msg_content = response.text
                         
