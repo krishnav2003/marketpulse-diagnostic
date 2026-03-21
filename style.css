@@ -1,0 +1,41 @@
+/* Metric Card Styling */
+div[data-testid="metric-container"] {
+    background-color: #1E1E2E;
+    border: 1px solid #2D2D44;
+    padding: 5% 5% 5% 10%;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease-in-out;
+}
+
+div[data-testid="metric-container"]:hover {
+    transform: translateY(-2px);
+    border: 1px solid #4F4F7A;
+}
+
+/* Metric Typography */
+div[data-testid="stMetricLabel"] {
+    color: #A6A6C3;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+/* Clean up headers */
+h1, h2, h3 {
+    color: #F8F9FA;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+/* Make Expanders look like feed cards */
+div[data-testid="stExpander"] {
+    background-color: #1E1E2E;
+    border: 1px solid #2D2D44;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
