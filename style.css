@@ -1,41 +1,77 @@
-/* Metric Card Styling */
-div[data-testid="metric-container"] {
-    background-color: #1E1E2E;
-    border: 1px solid #2D2D44;
-    padding: 5% 5% 5% 10%;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease-in-out;
+/* Cascading Entrance Animation */
+@keyframes slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-div[data-testid="metric-container"]:hover {
-    transform: translateY(-2px);
-    border: 1px solid #4F4F7A;
+/* Glassmorphism Metric Cards */
+.fintech-card {
+    background: linear-gradient(145deg, rgba(30, 30, 46, 0.6), rgba(42, 42, 64, 0.4));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    opacity: 0; /* Start hidden for animation */
+    animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
 }
 
-/* Metric Typography */
-div[data-testid="stMetricLabel"] {
+.fintech-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px 0 rgba(0, 120, 255, 0.15);
+    border: 1px solid rgba(0, 120, 255, 0.3);
+}
+
+/* Card Typography */
+.card-title {
     color: #A6A6C3;
+    font-size: 0.9rem;
     font-weight: 600;
-    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
 }
 
-div[data-testid="stMetricValue"] {
+.card-value {
     color: #FFFFFF;
+    font-size: 2.2rem;
     font-weight: 700;
+    margin-bottom: 4px;
+    line-height: 1.2;
 }
 
-/* Clean up headers */
-h1, h2, h3 {
-    color: #F8F9FA;
+.card-delta {
+    font-size: 0.95rem;
     font-weight: 600;
-    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-/* Make Expanders look like feed cards */
+/* Expanders (News Feed) */
 div[data-testid="stExpander"] {
-    background-color: #1E1E2E;
-    border: 1px solid #2D2D44;
-    border-radius: 8px;
-    margin-bottom: 10px;
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease;
+}
+
+div[data-testid="stExpander"]:hover {
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Clean up global headers */
+h1, h2, h3 {
+    font-family: 'Inter', -apple-system, sans-serif;
+    letter-spacing: -0.5px;
 }
