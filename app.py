@@ -1,0 +1,174 @@
+import streamlit as st
+import yfinance as yf
+from duckduckgo_search import DDGS
+import plotly.graph_objects as go
+from groq import Groq
+
+# 1. Configure page layout
+st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
+
+# --- CACHING FUNCTIONS ---
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_financial_data(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.info, stock.history(period="6mo")
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_news_data(company_name):
+    ddgs = DDGS()
+    return list(ddgs.news(f"{company_name} company news strategy", max_results=4))
+
+# 2. Sidebar for Inputs
+with st.sidebar:
+    st.markdown("### ⚙️ Control Panel")
+    ticker_symbol = st.text_input("Primary Ticker (e.g., NVDA):", "NVDA").upper()
+    comp_symbol = st.text_input("Competitor Ticker (Optional, e.g., AMD):", "AMD").upper()
+    
+    st.divider()
+    run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
+    st.divider()
+    st.caption("MarketPulse v5.0 | Secure Cloud Edition")
+
+# --- INITIALIZE SESSION STATE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "analyze_triggered" not in st.session_state:
+    st.session_state.analyze_triggered = False
+
+if run_btn:
+    st.session_state.analyze_triggered = True
+    st.session_state.messages = [] 
+    if "summary" in st.session_state:
+        del st.session_state["summary"]
+
+# 3. Main Dashboard Area
+if st.session_state.analyze_triggered:
+    with st.spinner("Aggregating intelligence..."):
+        try:
+            # --- Fetch Primary Data ---
+            info, hist = get_financial_data(ticker_symbol)
+            company_name = info.get('shortName', ticker_symbol)
+            
+            st.markdown(f"## 🏢 Strategic Diagnostic: {company_name}")
+            st.divider()
+            
+            # --- Top Row: Financial Metric Cards ---
+            st.subheader("Executive Financial Summary")
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            current_price = info.get('currentPrice', info.get('regularMarketPrice', 0.0))
+            previous_close = info.get('previousClose', current_price)
+            price_change = current_price - previous_close
+            pct_change = (price_change / previous_close) * 100 if previous_close else 0.0
+            
+            col1.metric("Current Price", f"${current_price:,.2f}", f"{price_change:,.2f} ({pct_change:.2f}%)")
+            market_cap = info.get('marketCap', 0)
+            col2.metric("Market Capitalization", f"${market_cap / 1e9:.2f}B" if market_cap else "N/A")
+            col3.metric("P/E Ratio (Trailing)", round(info.get('trailingPE', 0), 2) if info.get('trailingPE') else 'N/A')
+            col4.metric("52-Week High", f"${info.get('fiftyTwoWeekHigh', 'N/A')}")
+            col5.metric("Gross Margins", f"{info.get('grossMargins', 0) * 100:.1f}%" if info.get('grossMargins') else "N/A")
+            
+            # --- Middle Row: Charting ---
+            st.write("") 
+            if comp_symbol:
+                comp_info, comp_hist = get_financial_data(comp_symbol)
+                if not hist.empty and not comp_hist.empty:
+                    hist['PctReturn'] = (hist['Close'] / hist['Close'].iloc[0] - 1) * 100
+                    comp_hist['PctReturn'] = (comp_hist['Close'] / comp_hist['Close'].iloc[0] - 1) * 100
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=hist.index, y=hist['PctReturn'], mode='lines', name=ticker_symbol, line=dict(color='#0033A1', width=3)))
+                    fig.add_trace(go.Scatter(x=comp_hist.index, y=comp_hist['PctReturn'], mode='lines', name=comp_symbol, line=dict(color='#FF8300', width=3)))
+                    
+                    fig.update_layout(title=f"6-Month Performance Benchmark: {ticker_symbol} vs {comp_symbol}", yaxis_title="Normalized Return (%)", margin=dict(l=0, r=0, t=40, b=0), height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    comp_mcap = comp_info.get('marketCap', 0)
+                    if market_cap and comp_mcap:
+                        gap = abs(market_cap - comp_mcap)
+                        leader = ticker_symbol if market_cap > comp_mcap else comp_symbol
+                        st.caption(f"**Valuation Gap:** {leader} leads by ${gap / 1e9:.2f} Billion in Market Cap.")
+            else:
+                if not hist.empty:
+                    fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'])])
+                    fig.update_layout(title="6-Month Price Action & Volatility", yaxis_title="Price (USD)", margin=dict(l=0, r=0, t=40, b=0), height=400, xaxis_rangeslider_visible=False)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # --- Bottom Row: News & Synthesis ---
+            st.divider()
+            col_news, col_genai = st.columns([1, 1.2]) 
+            news_context = "" 
+            
+            with col_news:
+                st.subheader("📰 Live Market Context")
+                news_results = get_news_data(company_name)
+                
+                for article in news_results:
+                    with st.expander(f"**{article['title']}**", expanded=False):
+                        st.caption(f"Source: {article.get('source', 'Web')}")
+                        st.write(article['body'])
+                        news_context += f"Title: {article['title']}\nSummary: {article['body']}\n\n"
+            
+            with col_genai:
+                st.subheader("🧠 Automated Strategic Synthesis")
+                
+                # Fetch the hidden API key from secrets
+                api_key = st.secrets.get("GROQ_API_KEY")
+                
+                if not api_key:
+                    st.error("API Key not found in secrets.toml.")
+                elif news_context:
+                    if "summary" not in st.session_state:
+                        client = Groq(api_key=api_key)
+                        prompt = f"""
+                        Based strictly on the following recent news about {company_name}, provide a concise, 3-bullet-point strategic diagnostic. Format exactly like this:
+                        * ⚠️ **Immediate Headwinds:** [1 sentence]
+                        * 🔄 **Strategic Pivots:** [1 sentence]
+                        * 📊 **Market Sentiment:** [1 sentence]
+                        
+                        News Context: {news_context}
+                        """
+                        chat_completion = client.chat.completions.create(
+                            messages=[{"role": "user", "content": prompt}],
+                            model="llama-3.1-8b-instant", 
+                            temperature=0.2, 
+                        )
+                        st.session_state.summary = chat_completion.choices[0].message.content
+                    
+                    st.markdown(st.session_state.summary)
+                else:
+                    st.warning("No news context found to synthesize.")
+
+            # --- AI COPILOT CHAT ---
+            st.divider()
+            st.subheader("💬 Ask the Copilot")
+            st.caption(f"Ask questions specifically about {company_name}'s recent news and strategy.")
+            
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+            if prompt := st.chat_input(f"E.g., What are the main risks mentioned for {company_name}?"):
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                with st.chat_message("assistant"):
+                    client = Groq(api_key=st.secrets.get("GROQ_API_KEY"))
+                    system_msg = {"role": "system", "content": f"You are an expert strategic analyst. Answer this question directly and professionally, based ONLY on the following news context. Do not introduce yourself or use persona filler text like 'As an analyst'.\n\nContext: {news_context}"}
+                    api_messages = [system_msg] + st.session_state.messages
+                    
+                    response = client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=api_messages,
+                        temperature=0.4
+                    )
+                    msg_content = response.choices[0].message.content
+                    st.markdown(msg_content)
+                    st.session_state.messages.append({"role": "assistant", "content": msg_content})
+
+        except Exception as e:
+            st.error(f"An error occurred. Details: {e}")
+else:
+    st.title("📈 MarketPulse")
+    st.markdown("Please enter a stock ticker in the sidebar, then click **Generate Diagnostic**.")
