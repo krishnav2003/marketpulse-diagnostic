@@ -152,7 +152,7 @@ if st.session_state.analyze_triggered:
                     fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, title_font=dict(color='#A6A6C3'), tickfont=dict(color='#A6A6C3'))
                     
                     st.plotly_chart(fig, use_container_width=True)
-           else:
+            else:
                 if not hist.empty:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
