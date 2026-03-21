@@ -8,6 +8,16 @@ import urllib.parse
 # 1. Configure page layout
 st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
 
+# --- LOAD EXTERNAL CSS ---
+def load_css(file_name):
+    try:
+        with open(file_name) as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning(f"CSS file '{file_name}' not found. Loading without custom styles.")
+
+load_css("style.css")
+
 # --- CACHING FUNCTIONS ---
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_financial_data(ticker):
@@ -16,14 +26,12 @@ def get_financial_data(ticker):
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_news_data(company_name, ticker):
-    # Use Google News RSS feed for reliable, real-time, rate-limit-free data
     query = urllib.parse.quote(f"{ticker} stock OR {company_name} financial news")
     url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
     
     feed = feedparser.parse(url)
     news_items = []
     
-    # Grab the top 4 most recent articles
     for entry in feed.entries[:4]:
         publisher = entry.source.title if hasattr(entry, 'source') else 'Financial News'
         news_items.append({
@@ -43,7 +51,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v9.0 | RSS Intelligence Edition")
+    st.caption("MarketPulse v10.0 | Pro Architecture Edition")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
@@ -102,7 +110,17 @@ if st.session_state.analyze_triggered:
                     fig.add_trace(go.Scatter(x=hist.index, y=hist['PctReturn'], mode='lines', name=ticker_symbol, line=dict(color='#0033A1', width=3)))
                     fig.add_trace(go.Scatter(x=comp_hist.index, y=comp_hist['PctReturn'], mode='lines', name=comp_symbol, line=dict(color='#FF8300', width=3)))
                     
-                    fig.update_layout(title=f"6-Month Performance Benchmark: {ticker_symbol} vs {comp_symbol}", yaxis_title="Normalized Return (%)", margin=dict(l=0, r=0, t=40, b=0), height=400)
+                    fig.update_layout(
+                        title=f"6-Month Performance Benchmark: {ticker_symbol} vs {comp_symbol}", 
+                        yaxis_title="Normalized Return (%)", 
+                        margin=dict(l=0, r=0, t=40, b=0), 
+                        height=400,
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
+                    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#2D2D44')
+                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#2D2D44')
+                    
                     st.plotly_chart(fig, use_container_width=True)
                     
                     comp_mcap = comp_info.get('marketCap', 0)
@@ -113,7 +131,18 @@ if st.session_state.analyze_triggered:
             else:
                 if not hist.empty:
                     fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'])])
-                    fig.update_layout(title="6-Month Price Action & Volatility", yaxis_title="Price (USD)", margin=dict(l=0, r=0, t=40, b=0), height=400, xaxis_rangeslider_visible=False)
+                    fig.update_layout(
+                        title="6-Month Price Action & Volatility", 
+                        yaxis_title="Price (USD)", 
+                        margin=dict(l=0, r=0, t=40, b=0), 
+                        height=400, 
+                        xaxis_rangeslider_visible=False,
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
+                    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#2D2D44')
+                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#2D2D44')
+                    
                     st.plotly_chart(fig, use_container_width=True)
             
             # --- Bottom Row: News & Synthesis ---
@@ -124,7 +153,6 @@ if st.session_state.analyze_triggered:
             with col_news:
                 st.subheader("📰 Live Market Context")
                 
-                # Fetch RSS News
                 live_news = get_news_data(company_name, ticker_symbol)
                 
                 if live_news:
