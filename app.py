@@ -15,8 +15,12 @@ def get_financial_data(ticker):
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_news_data(company_name):
-    ddgs = DDGS()
-    return list(ddgs.news(f"{company_name} company news strategy", max_results=4))
+    try:
+        ddgs = DDGS()
+        return list(ddgs.news(f"{company_name} company news strategy", max_results=4))
+    except Exception:
+        # If DuckDuckGo rate-limits the server, return an empty list so the app survives
+        return []
 
 # 2. Sidebar for Inputs
 with st.sidebar:
