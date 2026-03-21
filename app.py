@@ -59,7 +59,7 @@ with st.sidebar:
     st.divider()
     run_btn = st.button("Generate Diagnostic", type="primary", use_container_width=True)
     st.divider()
-    st.caption("MarketPulse v11.0 | SaaS UI Edition")
+    st.caption("MarketPulse")
 
 # --- INITIALIZE SESSION STATE ---
 if "messages" not in st.session_state:
