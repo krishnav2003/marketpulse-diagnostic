@@ -146,7 +146,7 @@ if st.session_state.analyze_triggered:
             # --- AI COPILOT CHAT ---
             st.divider()
             st.subheader("💬 Ask the Copilot")
-            st.caption(f"Powered by Gemini 1.5 Flash. Ask questions specifically about {company_name}'s recent news and strategy.")
+           st.caption(f"Powered by Gemini 2.5 Flash. Ask questions specifically about {company_name}'s recent news and strategy.")
             
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
