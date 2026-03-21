@@ -139,18 +139,20 @@ if st.session_state.analyze_triggered:
                         fill='tozeroy', fillcolor='rgba(255, 131, 0, 0.1)'
                     ))
                     
-                    # Clean SaaS Layout Settings
+                    # Clean SaaS Layout Settings (Benchmark Chart)
                     fig.update_layout(
+                        title=dict(text=f"6-Month Performance Benchmark: {ticker_symbol} vs {comp_symbol}", font=dict(color='#F8F9FA', size=14)),
+                        yaxis_title="Normalized Return (%)",
                         hovermode='x unified',
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        margin=dict(l=0, r=0, t=20, b=0), height=400,
-                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor='rgba(0,0,0,0.5)')
+                        margin=dict(l=0, r=0, t=40, b=0), height=400,
+                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor='rgba(0,0,0,0.5)', font=dict(color='#A6A6C3'))
                     )
-                    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
-                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False)
+                    fig.update_xaxes(showgrid=False, zeroline=False, showline=False, tickfont=dict(color='#A6A6C3'))
+                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, title_font=dict(color='#A6A6C3'), tickfont=dict(color='#A6A6C3'))
                     
                     st.plotly_chart(fig, use_container_width=True)
-            else:
+           else:
                 if not hist.empty:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
@@ -158,13 +160,17 @@ if st.session_state.analyze_triggered:
                         line=dict(color='#00E676', width=3, shape='spline'),
                         fill='tozeroy', fillcolor='rgba(0, 230, 118, 0.1)'
                     ))
+                    # Clean SaaS Layout Settings (Solo Chart)
                     fig.update_layout(
+                        title=dict(text="6-Month Price Action & Volatility", font=dict(color='#F8F9FA', size=14)),
+                        yaxis_title="Price (USD)",
                         hovermode='x unified',
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        margin=dict(l=0, r=0, t=20, b=0), height=400
+                        margin=dict(l=0, r=0, t=40, b=0), height=400
                     )
-                    fig.update_xaxes(showgrid=False, zeroline=False)
-                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False)
+                    fig.update_xaxes(showgrid=False, zeroline=False, tickfont=dict(color='#A6A6C3'))
+                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, title_font=dict(color='#A6A6C3'), tickfont=dict(color='#A6A6C3'))
+                    
                     st.plotly_chart(fig, use_container_width=True)
             
             # --- Bottom Row: News & Synthesis ---
