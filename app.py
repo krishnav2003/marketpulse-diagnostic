@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import feedparser
 import urllib.parse
+import requests
 
 # 1. Configure page layout
 st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
@@ -37,7 +38,14 @@ def build_metric_card(title, value, delta_str, is_positive, delay_seconds):
 # --- CACHING FUNCTIONS ---
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_financial_data(ticker):
-    stock = yf.Ticker(ticker)
+    # Create a session to bypass Yahoo Finance scraping blocks
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
+    
+    # Pass the session into the Ticker object
+    stock = yf.Ticker(ticker, session=session)
     return stock.info, stock.history(period="6mo")
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -203,9 +211,18 @@ if st.session_state.analyze_triggered:
                         * 📊 **Market Sentiment:** [1 sentence]
                         News Context: {news_context}
                         """
-                        response = model.generate_content(prompt)
-                        st.session_state.summary = response.text
-                    st.markdown(st.session_state.summary)
+                        try:
+                            response = model.generate_content(prompt)
+                            st.session_state.summary = response.text
+                        except Exception as e:
+                            if "429" in str(e) or "quota" in str(e).lower():
+                                st.warning("⏳ Gemini API rate limit reached (5 requests/minute). Please wait 60 seconds before generating a new summary.")
+                            else:
+                                st.error(f"Synthesis Error: {e}")
+                    
+                    # Only print if summary successfully generated
+                    if "summary" in st.session_state:
+                        st.markdown(st.session_state.summary)
 
             # --- AI COPILOT CHAT ---
             st.divider()
@@ -229,11 +246,19 @@ if st.session_state.analyze_triggered:
                             conversation_block += f"{speaker}: {msg['content']}\n"
                         conversation_block += "Analyst:"
                         
-                        response = model.generate_content(conversation_block)
-                        msg_content = response.text
-                        
-                        st.markdown(msg_content)
-                        st.session_state.messages.append({"role": "assistant", "content": msg_content})
+                        try:
+                            response = model.generate_content(conversation_block)
+                            msg_content = response.text
+                            
+                            st.markdown(msg_content)
+                            st.session_state.messages.append({"role": "assistant", "content": msg_content})
+                        except Exception as e:
+                            if "429" in str(e) or "quota" in str(e).lower():
+                                st.warning("⏳ Rate limit reached. Please wait about 60 seconds before sending your next message.")
+                                # Remove the user's message from state so they can try asking it again
+                                st.session_state.messages.pop() 
+                            else:
+                                st.error(f"Chat Error: {e}")
 
         except Exception as e:
             st.error(f"An error occurred. Details: {e}")
