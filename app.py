@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import feedparser
 import urllib.parse
-import requests
 
 # 1. Configure page layout
 st.set_page_config(page_title="MarketPulse Diagnostic", page_icon="📈", layout="wide")
@@ -38,14 +37,8 @@ def build_metric_card(title, value, delta_str, is_positive, delay_seconds):
 # --- CACHING FUNCTIONS ---
 @st.cache_data(show_spinner=False, ttl=3600)
 def get_financial_data(ticker):
-    # Create a session to bypass Yahoo Finance scraping blocks
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    })
-    
-    # Pass the session into the Ticker object
-    stock = yf.Ticker(ticker, session=session)
+    # Letting yfinance handle the scraping bypass natively
+    stock = yf.Ticker(ticker)
     return stock.info, stock.history(period="6mo")
 
 @st.cache_data(show_spinner=False, ttl=3600)
